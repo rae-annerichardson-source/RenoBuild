@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>House model — garage extension, terrace deck and upper floor</title>
+<meta name="description" content="Interactive 3D model of a house with a two-car garage extension, terrace deck and built-out upper floor.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#EBEDEE;
+  --dim:#8E979C;
+  --line:#2A3034;
+  --panel:rgba(17,21,23,0.88);
+  --accent:#8FB6CE;
+}
+
+*{ box-sizing:border-box }
+
+html, body{
+  margin:0;
+  height:100%;
+  background:#0E1113;
+  color:var(--ink);
+  font-family:"Barlow", system-ui, -apple-system, sans-serif;
+  overflow:hidden;
+}
+
+#view{ position:absolute; inset:0 }
+canvas{ display:block }
+
+#head{ position:absolute; left:20px; top:18px; pointer-events:none; max-width:50% }
+#head h1{ margin:0; font-size:15px; font-weight:500 }
+#head p{ margin:2px 0 0; font-size:12.5px; color:var(--dim) }
+
+#bar{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:16px;
+  display:flex;
+  gap:5px;
+  align-items:center;
+  padding:7px;
+  border-radius:11px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  backdrop-filter:blur(14px);
+  max-width:calc(100% - 28px);
+  flex-wrap:wrap;
+  justify-content:center;
+}
+
+button, select{
+  font:inherit;
+  font-size:12.5px;
+  color:var(--ink);
+  background:transparent;
+  border:1px solid transparent;
+  border-radius:7px;
+  padding:6px 10px;
+  cursor:pointer;
+}
+select{ border-color:var(--line); background:#171B1E }
+button:hover{ background:#1D2326 }
+button.on{ color:#0E1113; background:var(--accent); border-color:var(--accent) }
+button:focus-visible, select:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
+.sep{ width:1px; height:20px; background:var(--line); margin:0 3px }
+
+#meter{ position:absolute; right:20px; top:18px; text-align:right; font-size:12px; color:var(--dim) }
+#bead{
+  display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--accent); margin-left:7px; vertical-align:middle;
+}
+#bead.done{ background:#3D4A50 }
+
+#rose{
+  position:absolute; right:20px; top:52px; width:62px; height:62px;
+  border:1px solid var(--line); border-radius:50%; background:var(--panel);
+}
+#roseInner{ position:absolute; inset:0 }
+#rose span{ position:absolute; font-size:10.5px; color:var(--dim) }
+#nBar{
+  position:absolute; left:50%; top:14px; margin-left:-4px; width:0; height:0;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-bottom:15px solid #B4574A;
+}
+#sBar{
+  position:absolute; left:50%; bottom:14px; margin-left:-4px; width:0; height:0;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:15px solid #48545A;
+}
+
+#hint{
+  position:absolute; left:20px; bottom:18px;
+  font-size:12px; color:var(--dim); max-width:230px; line-height:1.55; display:none;
+}
+
+#msg{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  max-width:440px; padding:18px 20px; border-radius:10px;
+  background:#171B1E; border:1px solid var(--line);
+  font-size:13.5px; line-height:1.65;
+}
+#msg b{ font-weight:500 }
+#msg code{ font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12.5px; color:var(--accent) }
+
+@media (max-width:700px){
+  #head{ left:14px; top:12px }
+  #meter{ right:14px; top:12px }
+  #rose{ display:none }
+  #hint{ display:none !important }
+  #bar{ bottom:10px; padding:6px }
+  button, select{ padding:5px 8px; font-size:12px }
+}
+</style>
+</head>
+<body>
+
+<div id="view"></div>
+
+<div id="head">
+  <h1>House model</h1>
+  <p>Garage extension, terrace deck and upper floor</p>
+</div>
+
+<div id="meter"><span id="spp">Starting</span><span id="bead"></span></div>
+
+<div id="rose">
+  <div id="roseInner">
+    <div id="nBar"></div>
+    <div id="sBar"></div>
+    <span style="left:50%;top:2px;margin-left:-3px">N</span>
+    <span style="right:4px;top:50%;margin-top:-7px">E</span>
+    <span style="left:50%;bottom:2px;margin-left:-3px">S</span>
+    <span style="left:4px;top:50%;margin-top:-7px">W</span>
+  </div>
+</div>
+
+<p id="hint">Drag to look around. W A S D or the arrow keys to move, Q and E for down and up, hold Shift to move faster.</p>
+
+<div id="bar">
+  <button id="mdOut" class="on">Outside</button>
+  <button id="mdGnd">Ground floor</button>
+  <button id="mdUp">Upper floor</button>
+  <button id="mdWalk">Walk through</button>
+  <span class="sep"></span>
+  <select id="rooms" aria-label="Go to a room">
+    <option value="">Go to a room…</option>
+  </select>
+  <span class="sep"></span>
+  <button id="m1">Morning</button>
+  <button id="m2" class="on">Midday</button>
+  <button id="m3">Afternoon</button>
+  <span class="sep"></span>
+  <button id="save">Save image</button>
+</div>
+
+<div id="msg">Loading…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- ==========================================================
+     Building geometry. Metres, true scale, from the 1990
+     drawings. X runs west to east, Z runs north from the road
+     to the rear, Y is up. Origin at the plot's north-west corner.
+     ========================================================== -->
+<script>
+/*
+ * model.js — all building geometry for the house, garage extension and site.
+ *
+ * Exposes a single global, HouseModel, with:
+ *   HouseModel.DIMS   plot dimensions in metres
+ *   HouseModel.ROOMS  named camera stations, one per room
+ *   HouseModel.build(THREE, renderer)  ->  { root, roofGroup, fillLights }
+ *
+ * Everything is modelled at true scale in metres, taken from the 1990
+ * approved drawings: plot 17.68 x 28.52, house 9.55 wide x 14.8 deep,
+ * front setback 4.5, west setback 3.35, east setback 4.78.
+ *
+ * Axes: X runs west to east, Z runs north (road) to south (rear), Y is up.
+ */
+(function (global) {
+  'use strict';
+
+  var PW = 17.68;   // plot width
+  var PD = 28.52;   // original plot depth
+  var RD = 9.00;    // amalgamated rear plot, indicative
+  var TD = PD + RD; // total depth
+
+  /* Camera stations: name, x, eye height, z, yaw */
+  var ROOMS = [
+    ['Front porch',         8.10, 1.65,  5.60, -0.10],
+    ['Living room',         9.80, 1.65, 10.60,  0.30],
+    ['Dining room',         5.10, 1.65, 12.30,  3.10],
+    ['Sewing room',         5.10, 1.65,  9.10,  3.10],
+    ['Kitchen',             5.10, 1.65, 15.30,  3.10],
+    ['TV room',            11.10, 1.65, 15.20, -0.30],
+    ['Guest room',         11.10, 1.65, 17.40, -0.30],
+    ['Toilet and bath',     8.40, 1.65, 17.60,  3.14],
+    ['Washroom',            5.20, 1.65, 17.60,  4.70],
+    ['Garage',              8.30, 1.65, 23.40,  1.57],
+    ['Garage WC + shower', 11.95, 1.65, 25.20,  3.14],
+    ['Landing (upper)',     7.95, 4.85, 14.60,  3.14],
+    ['Upstairs living',    10.40, 4.85, 15.20,  0.30],
+    ['Servery',            11.80, 4.85, 17.90,  3.14],
+    ['Loft reading nook',  11.80, 6.90, 16.00,  3.14],
+    ['Master bedroom',      5.30, 4.85, 17.30,  3.14],
+    ['Ensuite',             8.30, 4.85, 17.60,  3.14],
+    ['Family bathroom',    10.00, 4.85, 17.90,  3.14],
+    ['Bedroom 2',           5.00, 4.85, 14.30,  3.14],
+    ['Terrace deck',        9.60, 4.85, 24.60, -0.10]
+  ];
+
+  function build(THREE, renderer) {
+
+    var root = new THREE.Group();
+    root.position.set(-PW / 2, 0, -TD / 2);
+
+    var roofGroup = new THREE.Group();
+    root.add(roofGroup);
+
+    /* ---------------- helpers ---------------- */
+
+    function S(hex, rough, metal, opacity) {
+      var o = {
+        color: hex,
+        roughness: rough === undefined ? 0.9 : rough,
+        metalness: metal || 0,
+        side: THREE.DoubleSide
+      };
+      if (opacity !== undefined) { o.transparent = true; o.opacity = opacity; }
+      var m = new THREE.MeshStandardMaterial(o);
+      m.color.convertSRGBToLinear();
+      m.clipShadows = true;
+      return m;
+    }
+
+    /* Geometry cache: 850-odd boxes share a few dozen distinct sizes, so
+       reusing them cuts memory sharply on modest GPUs. */
+    var geoCache = {};
+    function boxGeo(w, h, d) {
+      var k = w.toFixed(3) + '|' + h.toFixed(3) + '|' + d.toFixed(3);
+      if (!geoCache[k]) geoCache[k] = new THREE.BoxGeometry(w, h, d);
+      return geoCache[k];
+    }
+    var planeCache = {};
+    function planeGeo(w, d) {
+      var k = 'p' + w.toFixed(3) + '|' + d.toFixed(3);
+      if (!planeCache[k]) planeCache[k] = new THREE.PlaneGeometry(w, d);
+      return planeCache[k];
+    }
+
+    function B(w, h, d, x, y, z, mat, parent, noShadow) {
+      var e = new THREE.Mesh(boxGeo(w, h, d), mat);
+      e.position.set(x, y, z);
+      if (!noShadow) { e.castShadow = true; e.receiveShadow = true; }
+      (parent || root).add(e);
+      return e;
+    }
+
+    function FLAT(w, d, x, z, mat, y, parent) {
+      var e = new THREE.Mesh(planeGeo(w, d), mat);
+      e.rotation.x = -Math.PI / 2;
+      e.position.set(x, y, z);
+      e.receiveShadow = true;
+      (parent || root).add(e);
+      return e;
+    }
+
+    /* Wall running east-west, with optional door openings [[x1,x2], ...] */
+    function wallX(x1, x2, z, h, base, mat, thick, gaps, doorH) {
+      thick = thick || 0.15; doorH = doorH || 2.1; gaps = gaps || [];
+      var pts = [x1], i;
+      for (i = 0; i < gaps.length; i++) { pts.push(gaps[i][0], gaps[i][1]); }
+      pts.push(x2);
+      for (i = 0; i < pts.length; i += 2) {
+        var a = pts[i], b = pts[i + 1];
+        if (b - a > 0.01) B(b - a, h, thick, (a + b) / 2, base + h / 2, z, mat);
+      }
+      for (i = 0; i < gaps.length; i++) {
+        var g = gaps[i], hh = h - doorH;
+        if (hh > 0.02) B(g[1] - g[0], hh, thick, (g[0] + g[1]) / 2, base + doorH + hh / 2, z, mat);
+      }
+    }
+
+    /* Wall running north-south, with optional door openings [[z1,z2], ...] */
+    function wallZ(z1, z2, x, h, base, mat, thick, gaps, doorH) {
+      thick = thick || 0.15; doorH = doorH || 2.1; gaps = gaps || [];
+      var pts = [z1], i;
+      for (i = 0; i < gaps.length; i++) { pts.push(gaps[i][0], gaps[i][1]); }
+      pts.push(z2);
+      for (i = 0; i < pts.length; i += 2) {
+        var a = pts[i], b = pts[i + 1];
+        if (b - a > 0.01) B(thick, h, b - a, x, base + h / 2, (a + b) / 2, mat);
+      }
+      for (i = 0; i < gaps.length; i++) {
+        var g = gaps[i], hh = h - doorH;
+        if (hh > 0.02) B(thick, hh, g[1] - g[0], x, base + doorH + hh / 2, (g[0] + g[1]) / 2, mat);
+      }
+    }
+
+    /* ---------------- textures ---------------- */
+
+    function paverTexture() {
+      var c = document.createElement('canvas'); c.width = 512; c.height = 512;
+      var x = c.getContext('2d');
+      x.fillStyle = '#57544E'; x.fillRect(0, 0, 512, 512);
+      var tones = ['#BAB5AB', '#C4BFB4', '#B0ABA1', '#BEB9AF', '#B5B0A6'];
+      for (var r = 0; r < 8; r++) {
+        var off = (r % 2) ? 64 : 0;
+        for (var col = -1; col < 5; col++) {
+          var px = col * 128 + off, py = r * 64;
+          x.fillStyle = tones[(r * 3 + col + 10) % tones.length];
+          x.fillRect(px + 4, py + 20, 120, 24);
+          x.fillRect(px + 32, py + 4, 64, 56);
+        }
+      }
+      var t = new THREE.CanvasTexture(c);
+      t.encoding = THREE.sRGBEncoding;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return t;
+    }
+    var PAVER = paverTexture();
+
+    function paving(w, d, x, z, y) {
+      var t = PAVER.clone(); t.needsUpdate = true;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(w / 1.25, d / 1.25);
+      var m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.88 });
+      m.clipShadows = true;
+      return FLAT(w, d, x, z, m, y);
+    }
+
+    function tileTexture(base, joint, n) {
+      var c = document.createElement('canvas'); c.width = 256; c.height = 256;
+      var x = c.getContext('2d');
+      x.fillStyle = joint; x.fillRect(0, 0, 256, 256);
+      var s = 256 / n;
+      for (var i = 0; i < n; i++) {
+        for (var j = 0; j < n; j++) {
+          x.fillStyle = base; x.fillRect(i * s + 2, j * s + 2, s - 4, s - 4);
+        }
+      }
+      var t = new THREE.CanvasTexture(c);
+      t.encoding = THREE.sRGBEncoding;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      return t;
+    }
+    var TEX_TILE = tileTexture('#CFC7B8', '#A69E8E', 4);
+    var TEX_WOOD = tileTexture('#9A6B3C', '#7A5227', 2);
+    var TEX_WET  = tileTexture('#9FBCC8', '#7C97A2', 6);
+    var TEX_UTIL = tileTexture('#A8AFA6', '#87907F', 5);
+
+    function floorMat(tex, rep, rough) {
+      var t = tex.clone(); t.needsUpdate = true;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep);
+      var m = new THREE.MeshStandardMaterial({
+        map: t, roughness: rough === undefined ? 0.55 : rough, side: THREE.DoubleSide
+      });
+      m.clipShadows = true;
+      return m;
+    }
+
+    /* ---------------- materials ---------------- */
+
+    var REN   = S(0xE9E2D3, 0.93),   // external render
+        INT   = S(0xF0EBE0, 0.95),   // internal partitions
+        PLIN  = S(0xC6BDAB, 0.95),   // plinth and bands
+        MET   = S(0x4C5450, 0.40, 0.82),
+        FAS   = S(0xF1ECE2, 0.80),
+        GUT   = S(0xE8E4DA, 0.52, 0.28),
+        GLS   = S(0x9CC0D4, 0.04, 0.0, 0.35),
+        FRM   = S(0x32383A, 0.44, 0.22),
+        DKM   = S(0x24282C, 0.38, 0.68),  // burglar proofing, railings
+        TIMB  = S(0xA9773F, 0.82),        // deck boards
+        TIMD  = S(0x7A5230, 0.85),        // loft platform
+        GDOOR = S(0x7E858B, 0.36, 0.58),
+        GPAN  = S(0x6E757B, 0.40, 0.50),
+        CONCM = S(0xB4AFA5, 0.93),
+        CAPM  = S(0xD9D3C5, 0.90),
+        GRS   = S(0x5E9439, 1.0),
+        GRS2  = S(0x6BA042, 1.0),
+        GRAV  = S(0x7C766C, 0.98),
+        FEN   = S(0x9AA0A2, 0.34, 0.78),
+        TRK   = S(0x63503C, 0.95),
+        LF    = S(0x37622C, 0.95),
+        LF2   = S(0x477A35, 0.95),
+        SAN   = S(0xF6F6F4, 0.28),
+        CHR   = S(0xC8CDD0, 0.18, 0.90),
+        CARB  = S(0x2A5F92, 0.24, 0.62),
+        CARR  = S(0xA83A3A, 0.24, 0.62),
+        TYRE  = S(0x1B1D1F, 0.92),
+        LVRM  = S(0x93A8B4, 0.40, 0.50),
+        DOORW = S(0x6A4A2E, 0.70),
+        SOFA  = S(0x4E657A, 0.85),
+        BEDL  = S(0xD6DEE6, 0.80),
+        BEDF  = S(0x7E8F9E, 0.85),
+        WOODF = S(0x8A6238, 0.60),
+        KITC  = S(0x46604F, 0.40),
+        KITT  = S(0x9EA6A8, 0.35),
+        APPL  = S(0xB9BFC2, 0.28, 0.70);
+
+    /* ---------------- site ---------------- */
+
+    var ground = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), GRS);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(PW / 2, -0.02, TD / 2);
+    ground.receiveShadow = true;
+    root.add(ground);
+    FLAT(PW, RD, PW / 2, PD + RD / 2, GRS2, 0.005);
+
+    // interlocking paver driveway, rear apron, side path, washroom landing
+    paving(3.15, 19.3, 1.72,  9.65,  0.05);
+    paving(6.15,  8.7, 3.22, 23.65,  0.05);
+    paving(1.20, 15.5, 14.0, 12.00,  0.05);
+    paving(1.50,  2.7, 2.45, 17.80,  0.07);
+
+    // gravel drip strips under the front eaves, in place of gutters
+    FLAT(0.55, 9.9,  2.70, 8.60, GRAV, 0.045);
+    FLAT(0.55, 9.9, 13.55, 8.60, GRAV, 0.045);
+
+    // boundary fencing
+    B(0.06, 1.85, 37.5,  0.10, 0.92, 18.70, FEN);
+    B(0.06, 1.85, 37.5, 17.58, 0.92, 18.70, FEN);
+    B(17.5, 1.85, 0.06,  8.84, 0.92, 37.45, FEN);
+
+    /* ---------------- ground floor slab and finishes ---------------- */
+
+    FLAT(9.55, 12.6, 8.125, 13.00, CONCM, 0.02);
+    FLAT(3.55, 3.0, 11.10, 17.80, floorMat(TEX_WOOD, 3), 0.03);  // guest room
+    FLAT(3.55, 3.0, 11.10, 14.80, floorMat(TEX_WOOD, 3), 0.03);  // TV room
+    FLAT(6.15, 6.1,  9.80, 10.25, floorMat(TEX_WOOD, 5), 0.03);  // living room
+    FLAT(3.40, 3.0,  5.05, 14.80, floorMat(TEX_UTIL, 3), 0.03);  // kitchen
+    FLAT(3.40, 3.0,  5.05, 17.80, floorMat(TEX_WET,  4), 0.03);  // washroom
+    FLAT(1.75, 2.5,  8.40, 18.05, floorMat(TEX_WET,  3), 0.03);  // toilet and bath
+    FLAT(3.30, 3.0,  5.02, 11.80, floorMat(TEX_TILE, 3), 0.03);  // dining
+    FLAT(3.30, 3.1,  5.02,  8.75, floorMat(TEX_TILE, 3), 0.03);  // sewing
+    FLAT(2.45, 3.5,  7.95, 15.05, floorMat(TEX_TILE, 3), 0.03);  // passage
+
+    /* ---------------- ground floor external walls ---------------- */
+
+    wallX(3.35, 12.90, 19.30, 3.2, 0, REN, 0.24, []);
+    wallX(3.35, 12.90,  6.70, 3.2, 0, REN, 0.24, [[7.60, 8.60]], 2.15); // front door
+    wallZ(6.70, 19.30, 12.90, 3.2, 0, REN, 0.24, []);
+    wallZ(6.70, 16.58,  3.35, 3.2, 0, REN, 0.24, []);
+    wallZ(19.02, 19.30, 3.35, 3.2, 0, REN, 0.24, []);
+
+    // 8 ft washroom opening: columns each side, beam over, canopy
+    B(0.30, 3.2, 0.30, 3.35, 1.60, 16.58, REN);
+    B(0.30, 3.2, 0.30, 3.35, 1.60, 19.02, REN);
+    B(0.28, 0.38, 2.44, 3.35, 2.79, 17.80, CONCM);
+    B(0.24, 0.23, 2.44, 3.35, 3.10, 17.80, REN);
+    B(0.34, 0.16, 2.95, 2.70, 3.28, 17.80, CONCM);
+
+    B(9.85, 0.24, 0.32, 8.125, 3.30, 19.30, PLIN, null, true);
+    B(9.85, 0.16, 0.32, 8.125, 0.22, 19.30, PLIN, null, true);
+    B(0.32, 0.16, 12.85, 12.90, 0.22, 13.00, PLIN, null, true);
+    B(0.32, 0.16,  9.90,  3.35, 0.22, 11.60, PLIN, null, true);
+
+    /* ---------------- ground floor partitions ---------------- */
+
+    wallX(9.30, 12.90, 16.30, 3.2, 0, INT, 0.14, [[10.00, 10.90]]);
+    wallX(3.35,  6.80, 16.30, 3.2, 0, INT, 0.14, [[4.50, 5.40]]);
+    wallZ(13.30, 19.30, 9.30, 3.2, 0, INT, 0.14, [[14.20, 15.10], [17.00, 17.90]]);
+    wallZ(13.30, 19.30, 6.80, 3.2, 0, INT, 0.14, [[14.20, 15.10], [17.40, 18.30]]);
+    wallX(6.80,  9.30, 16.80, 3.2, 0, INT, 0.14, [[7.80, 8.60]]);
+    wallZ(16.80, 19.30, 7.50, 3.2, 0, INT, 0.14, []);
+    wallX(6.80, 12.90, 13.30, 3.2, 0, INT, 0.14, [[9.60, 11.20]], 2.35);
+    wallZ(7.20, 13.30,  6.70, 3.2, 0, INT, 0.14, [[10.80, 11.70]]);
+    wallX(3.35,  6.70, 10.30, 3.2, 0, INT, 0.14, [[5.40, 6.30]]);
+
+    /* ---------------- upper floor slab, with stair void ---------------- */
+
+    B(4.20, 0.26, 6.54,  5.350, 3.07, 16.150, CONCM);
+    B(4.37, 0.26, 6.54, 10.835, 3.07, 16.150, CONCM);
+    B(1.20, 0.26, 0.47,  8.050, 3.07, 13.115, CONCM);
+    B(1.20, 0.26, 3.32,  8.050, 3.07, 17.760, CONCM);
+
+    FLAT(3.55, 4.35, 11.10, 15.17, floorMat(TEX_WOOD, 4), 3.215); // upper living
+    FLAT(2.20, 1.95, 11.80, 18.32, floorMat(TEX_TILE, 2), 3.215); // servery
+    FLAT(3.95, 3.00,  5.32, 17.80, floorMat(TEX_WOOD, 3), 3.215); // master
+    FLAT(3.25, 3.30,  4.97, 14.65, floorMat(TEX_WOOD, 3), 3.215); // bedroom 2
+    FLAT(2.00, 2.50,  8.30, 18.05, floorMat(TEX_WET,  3), 3.215); // ensuite
+    FLAT(1.40, 1.95, 10.00, 18.32, floorMat(TEX_WET,  3), 3.215); // family bath
+    FLAT(2.70, 3.30,  7.95, 14.65, floorMat(TEX_TILE, 3), 3.215); // landing
+
+    /* ---------------- upper floor walls ---------------- */
+
+    wallX(3.35, 12.90, 19.30, 3.0, 3.2, REN, 0.24, []);
+    wallX(3.35, 12.90, 13.00, 3.0, 3.2, REN, 0.24, []);
+    wallZ(13.00, 19.30, 3.35, 3.0, 3.2, REN, 0.24, []);
+    B(0.24, 4.87, 6.50, 12.90, 5.635, 16.15, REN); // tall east wall under the mono-pitch
+
+    // gable end walls, sloping from 6.36 at the west to 8.06 at the east
+    function gableWall(zp) {
+      var s = new THREE.Shape();
+      s.moveTo(3.35, 3.2); s.lineTo(12.90, 3.2);
+      s.lineTo(12.90, 8.06); s.lineTo(3.35, 6.36); s.closePath();
+      var m = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.24, bevelEnabled: false }), REN);
+      m.position.z = zp; m.castShadow = true; m.receiveShadow = true;
+      root.add(m);
+    }
+    gableWall(12.88);
+    gableWall(19.18);
+
+    wallZ(13.00, 19.30, 9.30, 3.0, 3.2, INT, 0.14, [[14.00, 14.90]]);
+    wallX(9.30, 10.70, 17.35, 3.0, 3.2, INT, 0.14, [[9.60, 10.40]]);
+    wallZ(17.35, 19.30, 10.70, 3.0, 3.2, INT, 0.14, []);
+    wallZ(16.30, 19.30, 7.30, 3.0, 3.2, INT, 0.14, [[17.80, 18.60]]);
+    wallX(7.30, 9.30, 16.80, 3.0, 3.2, INT, 0.14, []);
+    wallZ(13.00, 16.30, 6.60, 3.0, 3.2, INT, 0.14, [[14.60, 15.50]]);
+    wallX(3.35, 7.30, 16.30, 3.0, 3.2, INT, 0.14, [[6.70, 7.25]]);
+
+    /* ---------------- internal stair ---------------- */
+
+    for (var i = 0; i < 12; i++) {
+      B(1.10, 0.26, 0.38, 8.05, 0.13 + i * 0.267, 13.55 + i * 0.38, CONCM);
+    }
+    B(0.06, 0.95, 4.70, 7.48, 3.72, 15.60, DKM, null, true);
+    for (i = 1; i < 10; i++) B(0.04, 0.90, 0.04, 7.48, 3.68, 13.70 + i * 0.42, DKM, null, true);
+
+    /* ---------------- loft reading nook ---------------- */
+
+    B(2.20, 0.22, 3.90, 11.80, 5.69, 17.35, TIMD);
+    B(0.10, 0.90, 3.90, 10.75, 6.25, 17.35, DKM, null, true);
+    B(0.80, 0.90, 0.10, 11.10, 6.25, 15.45, DKM, null, true);
+    for (i = 0; i < 9; i++) {          // alternating tread stair
+      var off = (i % 2 === 0) ? -0.20 : 0.20;
+      B(0.44, 0.09, 0.30, 12.10 + off, 3.52 + i * 0.29, 13.95 + i * 0.17, TIMD);
+    }
+    B(0.07, 2.60, 0.07, 11.55, 4.60, 14.60, DKM, null, true);
+    B(1.30, 0.50, 0.80, 11.60, 6.05, 16.60, SOFA);
+    B(0.50, 0.06, 0.50, 12.30, 6.03, 17.60, WOODF);
+    B(2.10, 0.85, 0.30, 11.80, 6.22, 19.10, WOODF);
+
+    /* ---------------- glazing ---------------- */
+
+    function winZ(x, y, z, w, h) {
+      B(0.09, 0.09, w, x, y + h / 2, z, FRM, null, true);
+      B(0.09, 0.09, w, x, y - h / 2, z, FRM, null, true);
+      B(0.09, h, 0.09, x, y, z - w / 2, FRM, null, true);
+      B(0.09, h, 0.09, x, y, z + w / 2, FRM, null, true);
+      B(0.06, h, 0.06, x, y, z, FRM, null, true);
+      B(0.05, h - 0.06, w - 0.06, x, y, z, GLS, null, true);
+      B(0.17, 0.07, w + 0.12, x - 0.03, y - h / 2 - 0.06, z, CAPM, null, true);
+    }
+    function winX(x, y, z, w, h) {
+      B(w, 0.09, 0.09, x, y + h / 2, z, FRM, null, true);
+      B(w, 0.09, 0.09, x, y - h / 2, z, FRM, null, true);
+      B(0.09, h, 0.09, x - w / 2, y, z, FRM, null, true);
+      B(0.09, h, 0.09, x + w / 2, y, z, FRM, null, true);
+      B(0.06, h, 0.06, x, y, z, FRM, null, true);
+      B(w - 0.06, h - 0.06, 0.05, x, y, z, GLS, null, true);
+      B(w + 0.12, 0.07, 0.17, x, y - h / 2 - 0.06, z - 0.03, CAPM, null, true);
+    }
+
+    // ground floor
+    winZ(12.99, 1.95, 17.80, 1.5, 1.35);   // guest room, east
+    winZ(12.99, 1.95, 14.80, 1.5, 1.35);   // TV room, east
+    winZ(12.99, 1.95, 12.10, 1.6, 1.35);   // living room, east
+    winZ(12.99, 1.95,  9.30, 1.6, 1.35);   // living room, east
+    winZ( 3.26, 1.95, 14.80, 1.6, 1.35);   // kitchen, west
+    winZ( 3.26, 1.95, 11.80, 1.6, 1.35);   // dining, west
+    winZ( 3.26, 1.95,  8.60, 1.6, 1.35);   // sewing, west
+    winX( 4.80, 1.95, 19.41, 1.3, 1.20);   // washroom, rear
+    winX(10.90, 1.95,  6.59, 2.1, 1.35);   // front
+    winX( 5.30, 1.95,  6.59, 2.1, 1.35);   // front
+    B(1.02, 2.12, 0.10, 8.10, 1.08, 6.62, DOORW);  // front door leaf
+
+    // upper floor
+    winZ(12.99, 4.55, 15.00, 1.6, 1.45);   // upstairs living, east
+    winZ(12.99, 4.55, 17.60, 1.4, 1.45);
+    winZ( 3.26, 4.55, 17.60, 1.6, 1.45);   // master, west
+    winZ( 3.26, 4.55, 14.40, 1.6, 1.45);   // bedroom 2, west
+    winX( 5.00, 4.55, 12.89, 1.6, 1.45);   // bedroom 2, north
+    winX(11.00, 4.55, 12.89, 1.6, 1.45);   // upstairs living, north
+    winX( 5.00, 4.35, 19.41, 1.4, 1.30);   // master, onto the deck
+    winX( 8.30, 4.55, 19.41, 0.8, 0.90);   // ensuite
+    winX(10.00, 4.55, 19.41, 0.8, 0.90);   // family bathroom
+    B(1.45, 2.25, 0.14, 11.80, 4.32, 19.40, FRM, null, true);   // deck door
+    B(1.30, 2.10, 0.07, 11.80, 4.32, 19.42, GLS, null, true);
+    B(0.26, 0.78, 3.80, 12.99, 7.30, 15.70, DKM, null, true);   // high louvre band
+    for (i = 0; i < 10; i++) B(0.30, 0.055, 0.05, 12.99, 7.30, 13.95 + i * 0.4, LVRM, null, true);
+
+    /* ---------------- washroom gate, 8 ft, two leaves folded back ---------------- */
+
+    function gateLeaf(zp) {
+      var g = new THREE.Group();
+      B(1.22, 0.09, 0.09, 0, 2.38, 0, DKM, g, true);
+      B(1.22, 0.09, 0.09, 0, 0.16, 0, DKM, g, true);
+      B(0.09, 2.30, 0.09, -0.585, 1.27, 0, DKM, g, true);
+      B(0.09, 2.30, 0.09,  0.585, 1.27, 0, DKM, g, true);
+      for (var k = 1; k < 12; k++) B(0.045, 2.15, 0.045, -0.61 + k * 0.1017, 1.27, 0, DKM, g, true);
+      g.position.set(4.02, 0, zp);
+      root.add(g);
+    }
+    gateLeaf(16.66);
+    gateLeaf(18.94);
+
+    /* ---------------- front porch ---------------- */
+
+    FLAT(9.90, 2.55, 8.125, 5.58, CONCM, 0.17);
+    B(1.75, 0.10, 0.36, 8.10, 0.12, 4.30, CONCM);
+    B(1.75, 0.10, 0.36, 8.10, 0.03, 4.66, CONCM);
+
+    function halfX(x1, x2, z) {
+      B(Math.abs(x2 - x1), 0.90, 0.24, (x1 + x2) / 2, 0.63, z, REN);
+      B(Math.abs(x2 - x1), 0.09, 0.32, (x1 + x2) / 2, 1.12, z, CAPM);
+    }
+    function halfZ(z1, z2, x) {
+      B(0.24, 0.90, Math.abs(z2 - z1), x, 0.63, (z1 + z2) / 2, REN);
+      B(0.32, 0.09, Math.abs(z2 - z1), x, 1.12, (z1 + z2) / 2, CAPM);
+    }
+    halfX(3.40, 6.60, 4.62); halfX(9.60, 12.85, 4.62);
+    halfZ(4.62, 6.70, 3.49); halfZ(4.62, 6.70, 12.76);
+    B(0.32, 2.90, 0.32,  3.49, 1.62, 4.62, REN);
+    B(0.32, 2.90, 0.32, 12.76, 1.62, 4.62, REN);
+    B(0.26, 2.90, 0.26,  6.66, 1.62, 4.55, REN);
+    B(0.26, 2.90, 0.26,  9.54, 1.62, 4.55, REN);
+
+    function pbX(x1, x2, z) {
+      var n = Math.floor((x2 - x1) / 0.155);
+      for (var k = 1; k < n; k++) B(0.045, 1.78, 0.045, x1 + k * 0.155, 2.06, z, DKM, null, true);
+      B(Math.abs(x2 - x1), 0.06, 0.08, (x1 + x2) / 2, 1.20, z, DKM, null, true);
+      B(Math.abs(x2 - x1), 0.06, 0.08, (x1 + x2) / 2, 2.94, z, DKM, null, true);
+    }
+    function pbZ(z1, z2, x) {
+      var n = Math.floor((z2 - z1) / 0.155);
+      for (var k = 1; k < n; k++) B(0.045, 1.78, 0.045, x, 2.06, z1 + k * 0.155, DKM, null, true);
+      B(0.08, 0.06, Math.abs(z2 - z1), x, 1.20, (z1 + z2) / 2, DKM, null, true);
+      B(0.08, 0.06, Math.abs(z2 - z1), x, 2.94, (z1 + z2) / 2, DKM, null, true);
+    }
+    pbX(3.52, 6.53, 4.62); pbX(9.67, 12.73, 4.62);
+    pbZ(4.76, 6.64, 3.49); pbZ(4.76, 6.64, 12.76);
+
+    // double-leaf grille gate, 3 m opening in front of the main door
+    B(0.09, 2.85, 0.09, 8.10, 1.62, 4.50, DKM, null, true);
+    for (i = 1; i < 11; i++) B(0.045, 2.64, 0.045, 6.80 + i * 0.118, 1.60, 4.50, DKM, null, true);
+    for (i = 1; i < 11; i++) B(0.045, 2.64, 0.045, 8.24 + i * 0.118, 1.60, 4.50, DKM, null, true);
+    B(1.42, 0.08, 0.08, 7.39, 2.94, 4.50, DKM, null, true);
+    B(1.42, 0.08, 0.08, 8.83, 2.94, 4.50, DKM, null, true);
+
+    /* ---------------- roofs ---------------- */
+
+    function roofPlane(px, py, pz, rot, len, dep, step) {
+      var g = new THREE.Group();
+      g.position.set(px, py, pz); g.rotation.z = rot;
+      roofGroup.add(g);
+      var pl = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, dep), MET);
+      pl.castShadow = true; pl.receiveShadow = true; g.add(pl);
+      var n = Math.floor(len / step);
+      for (var k = 1; k < n; k++) {
+        var r = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.075, dep), MET);
+        r.position.set(-len / 2 + k * step, 0.125, 0);
+        r.castShadow = true; g.add(r);
+      }
+    }
+    var a1 = Math.atan2(1.3, 5.3);    // front gable pitch
+    var a2 = Math.atan2(1.8, 9.95);   // rear mono-pitch, rising east
+    roofPlane( 5.500, 3.90,  8.60,  a1,  5.50, 9.80, 0.42);
+    roofPlane(10.750, 3.90,  8.60, -a1,  5.50, 9.80, 0.42);
+    roofPlane( 8.125, 7.30, 16.15,  a2, 10.15, 7.80, 0.46);
+    B(0.38, 0.13, 9.80, 8.125, 4.65,  8.60, MET, roofGroup);
+    B(0.07, 0.28, 9.80,  2.78, 3.04,  8.60, FAS, roofGroup);
+    B(0.07, 0.28, 9.80, 13.47, 3.04,  8.60, FAS, roofGroup);
+    B(0.07, 0.28, 7.80,  3.07, 6.22, 16.15, FAS, roofGroup);
+    B(0.07, 0.28, 7.80, 13.18, 8.02, 16.15, FAS, roofGroup);
+    B(5.60, 0.16, 0.08,  5.50, 3.92,  3.74, FAS, roofGroup);
+    B(5.60, 0.16, 0.08, 10.75, 3.92,  3.74, FAS, roofGroup);
+
+    /* ---------------- guttering: rear roof and deck only ---------------- */
+
+    function gutter(x, y, z, dep) {
+      B(0.16, 0.14, dep, x, y, z, GUT);
+      B(0.19, 0.03, dep, x, y + 0.08, z, GUT, null, true);
+    }
+    function downpipe(x, z, top) {
+      B(0.11, top - 0.05, 0.11, x, (top + 0.05) / 2, z, GUT);
+      B(0.18, 0.13, 0.26, x, 0.13, z + 0.11, GUT);
+    }
+    gutter(2.99, 6.08, 16.15, 7.85);
+    downpipe(3.01, 13.28, 6.02);
+    downpipe(3.01, 19.14, 6.02);
+    B(0.26, 0.11, 0.32, 6.16, 3.00, 21.60, GUT);   // deck scuppers
+    B(0.26, 0.11, 0.32, 6.16, 3.00, 25.80, GUT);
+    downpipe(6.14, 21.60, 2.96);
+    downpipe(6.14, 25.80, 2.96);
+
+    /* ---------------- garage, WC and shower, terrace deck ---------------- */
+
+    B(6.60, 2.95, 0.24,  9.60, 1.48, 26.88, REN);
+    B(0.24, 2.95, 7.58, 12.90, 1.48, 23.09, REN);   // east wall, flush with the house
+    B(0.24, 2.95, 0.62,  6.30, 1.48, 21.44, REN);
+    B(0.24, 2.95, 0.62,  6.30, 1.48, 26.57, REN);
+    FLAT(6.62, 7.60, 9.60, 23.09, CONCM, 0.09);
+
+    // toilet and shower compartment, south-east corner
+    wallX(11.00, 12.90, 24.50, 2.60, 0.10, INT, 0.14, [[11.70, 12.50]]);
+    wallZ(24.50, 26.88, 11.00, 2.60, 0.10, INT, 0.14, []);
+    FLAT(1.85, 2.30, 11.95, 25.70, floorMat(TEX_WET, 3), 0.11);
+    B(0.40, 0.42, 0.60, 12.45, 0.32, 25.05, SAN);              // pan
+    B(0.22, 0.55, 0.44, 12.72, 0.49, 25.05, SAN);              // cistern
+    B(0.90, 0.06, 0.90, 11.55, 0.14, 26.30, SAN);              // shower tray
+    B(0.05, 2.00, 0.90, 11.10, 1.11, 26.30, GLS, null, true);  // screen
+    B(0.10, 0.10, 0.06, 11.20, 1.95, 26.30, CHR, null, true);  // shower arm
+    B(0.55, 0.16, 0.36, 12.55, 0.94, 26.55, SAN);              // basin
+    B(0.06, 0.20, 0.06, 12.72, 1.12, 26.55, CHR, null, true);  // tap
+    B(0.05, 0.60, 0.44, 12.80, 1.55, 26.10, GLS, null, true);  // mirror
+    B(0.16, 0.72, 0.16, 12.84, 2.42, 25.70, LVRM, null, true); // louvre
+
+    // deck slab, flush with the upper floor level
+    B(6.92, 0.30, 6.00,  9.585, 3.05, 23.95, CONCM);
+    B(3.10, 0.30, 2.10, 11.490, 3.05, 20.15, CONCM);
+    for (var k2 = 0; k2 < 7; k2++) B(0.15, 0.055, 5.90, 6.60 + k2 * 0.985, 3.225, 23.95, TIMB, null, true);
+    for (k2 = 0; k2 < 3; k2++)     B(3.00, 0.055, 0.15, 11.49, 3.225, 19.45 + k2 * 0.72, TIMB, null, true);
+
+    B(0.22, 2.58, 4.66, 6.30, 1.31, 24.05, GDOOR);   // sectional door
+    for (i = 0; i < 5; i++) B(0.24, 0.045, 4.60, 6.29, 0.34 + i * 0.525, 24.05, GPAN, null, true);
+    B(0.22, 0.74, 4.10, 12.92, 2.41, 23.90, DKM, null, true);   // east louvre band
+    for (i = 0; i < 10; i++) B(0.24, 0.055, 0.05, 12.92, 2.41, 22.0 + i * 0.42, LVRM, null, true);
+    B(2.10, 0.74, 0.22, 8.60, 2.41, 26.96, DKM, null, true);    // south louvre
+
+    function railing(x, y, z, w, d) {
+      B(w, 0.09, d, x, y + 0.99, z, DKM, null, true);
+      var n, k;
+      if (d < w) {
+        n = Math.floor(w / 0.135);
+        for (k = 1; k < n; k++) B(0.035, 0.96, 0.035, x - w / 2 + k * 0.135, y + 0.5, z, DKM, null, true);
+      } else {
+        n = Math.floor(d / 0.135);
+        for (k = 1; k < n; k++) B(0.035, 0.96, 0.035, x, y + 0.5, z - d / 2 + k * 0.135, DKM, null, true);
+      }
+    }
+    railing( 9.585, 3.20, 26.95, 6.92, 0.09);
+    railing(13.000, 3.20, 23.95, 0.09, 6.00);
+    railing( 6.190, 3.20, 23.95, 0.09, 6.00);
+    railing(11.490, 3.20, 19.22, 3.10, 0.09);
+    railing( 8.100, 3.20, 21.05, 3.70, 0.09);
+
+    // retained external stair, rising through the deck void
+    for (i = 0; i < 12; i++) B(0.48, 0.27, 1.12, 3.84 + i * 0.48, 0.135 + i * 0.267, 20.15, CONCM);
+    B(0.07, 0.95, 5.90, 3.58, 2.20, 20.72, DKM, null, true);
+    B(0.09, 2.85, 0.09, 6.30, 1.45, 19.42, DKM, null, true);   // gate across the stair recess
+    for (i = 1; i < 13; i++) B(0.045, 2.30, 0.045, 6.30, 1.40, 19.34 + i * 0.135, DKM, null, true);
+    B(0.09, 0.09, 1.75, 6.30, 2.62, 20.22, DKM, null, true);
+
+    /* ---------------- furniture ---------------- */
+
+    // living room
+    B(2.40, 0.42, 0.95, 11.60, 0.24,  9.10, SOFA);
+    B(2.40, 0.55, 0.30, 11.60, 0.50,  8.70, SOFA);
+    B(1.90, 0.40, 0.90,  9.10, 0.23, 11.60, SOFA);
+    B(1.20, 0.06, 0.65, 10.60, 0.42, 10.20, WOODF);
+    B(0.12, 0.40, 0.12, 10.15, 0.20, 10.20, WOODF);
+    B(0.12, 0.40, 0.12, 11.05, 0.20, 10.20, WOODF);
+    // dining
+    B(1.70, 0.07, 0.95, 5.02, 0.75, 11.80, WOODF);
+    B(0.10, 0.72, 0.10, 4.30, 0.38, 11.45, WOODF);
+    B(0.10, 0.72, 0.10, 5.72, 0.38, 11.45, WOODF);
+    B(0.10, 0.72, 0.10, 4.30, 0.38, 12.15, WOODF);
+    B(0.10, 0.72, 0.10, 5.72, 0.38, 12.15, WOODF);
+    for (i = 0; i < 2; i++) {
+      B(0.42, 0.06, 0.42, 4.55 + i * 0.95, 0.46, 11.20, WOODF);
+      B(0.42, 0.06, 0.42, 4.55 + i * 0.95, 0.46, 12.40, WOODF);
+    }
+    // kitchen
+    B(3.20, 0.88, 0.62, 5.00, 0.44, 13.62, KITC);
+    B(3.20, 0.05, 0.66, 5.00, 0.90, 13.62, KITT);
+    B(0.60, 0.62, 0.58, 3.72, 0.31, 15.90, KITC);
+    B(0.60, 0.05, 0.62, 3.72, 0.63, 15.90, KITT);
+    B(0.62, 1.70, 0.62, 6.35, 0.85, 14.10, APPL);
+    B(3.00, 0.60, 0.34, 5.00, 1.95, 13.55, KITC);
+    B(0.50, 0.03, 0.36, 4.30, 0.93, 13.62, CHR, null, true);
+    // sewing room
+    B(1.40, 0.06, 0.70, 5.02, 0.76, 8.20, WOODF);
+    B(0.10, 0.72, 0.10, 4.40, 0.38, 8.20, WOODF);
+    B(0.10, 0.72, 0.10, 5.64, 0.38, 8.20, WOODF);
+    B(0.45, 0.06, 0.45, 5.02, 0.46, 8.90, WOODF);
+    B(0.60, 1.80, 0.55, 3.80, 0.90, 9.60, WOODF);
+    // TV room
+    B(2.10, 0.40, 0.85, 11.10, 0.23, 13.90, SOFA);
+    B(1.30, 0.06, 0.42, 11.10, 0.55, 16.00, WOODF);
+    B(1.10, 0.62, 0.05, 11.10, 1.00, 16.10, DKM, null, true);
+    // guest room
+    B(1.45, 0.42, 2.00, 11.60, 0.25, 17.90, BEDF);
+    B(1.45, 0.16, 1.90, 11.60, 0.52, 17.95, BEDL);
+    B(1.20, 0.14, 0.42, 11.60, 0.66, 18.75, BEDL);
+    B(0.45, 0.50, 0.42, 10.30, 0.25, 18.80, WOODF);
+    B(0.60, 1.90, 0.55, 10.10, 0.95, 16.90, WOODF);
+    // toilet and bath, ground floor
+    B(0.40, 0.42, 0.60, 8.05, 0.24, 18.85, SAN);
+    B(0.22, 0.55, 0.44, 8.05, 0.41, 19.13, SAN);
+    B(1.60, 0.52, 0.70, 8.40, 0.26, 17.35, SAN);
+    B(0.50, 0.16, 0.34, 7.80, 0.86, 18.20, SAN);
+    // washroom
+    B(0.78, 0.92, 0.70, 6.30, 0.46, 18.72, APPL);
+    B(0.78, 0.92, 0.70, 6.30, 0.46, 17.80, APPL);
+    B(1.20, 0.24, 0.60, 4.80, 0.62, 19.00, SAN);
+    B(1.30, 0.06, 0.64, 4.80, 0.76, 19.00, KITT);
+    // upstairs living room
+    B(2.40, 0.42, 0.95, 11.60, 3.44, 14.30, SOFA);
+    B(2.40, 0.55, 0.30, 11.60, 3.70, 13.92, SOFA);
+    B(1.10, 0.06, 0.60, 10.60, 3.65, 14.60, WOODF);
+    B(0.45, 0.50, 0.45,  9.90, 3.46, 16.60, LF2);
+    // servery, no cooking
+    B(0.50, 0.88, 1.70, 12.62, 3.66, 18.20, KITC);
+    B(0.54, 0.05, 1.74, 12.62, 4.13, 18.20, KITT);
+    B(0.40, 0.03, 0.34, 12.62, 4.17, 18.60, CHR, null, true);
+    B(0.55, 0.85, 0.58, 11.85, 3.64, 17.72, APPL);
+    B(0.46, 0.55, 1.40, 12.66, 5.05, 18.30, KITC);
+    // master bedroom
+    B(1.90, 0.42, 2.05, 5.60, 3.45, 17.95, BEDF);
+    B(1.90, 0.16, 1.95, 5.60, 3.72, 18.00, BEDL);
+    B(1.60, 0.16, 0.44, 5.60, 3.86, 18.82, BEDL);
+    B(0.45, 0.48, 0.42, 4.30, 3.45, 18.85, WOODF);
+    B(0.45, 0.48, 0.42, 6.90, 3.45, 18.85, WOODF);
+    B(2.00, 1.95, 0.58, 4.80, 4.18, 16.70, WOODF);
+    // bedroom 2
+    B(1.45, 0.42, 2.00, 4.30, 3.45, 14.60, BEDF);
+    B(1.45, 0.16, 1.90, 4.30, 3.72, 14.65, BEDL);
+    B(0.42, 0.48, 0.42, 4.30, 3.45, 15.85, WOODF);
+    B(1.60, 1.90, 0.56, 5.70, 4.15, 13.40, WOODF);
+    // ensuite
+    B(0.40, 0.42, 0.60, 7.75, 3.44, 18.85, SAN);
+    B(0.22, 0.55, 0.44, 7.75, 3.61, 19.13, SAN);
+    B(1.00, 0.06, 1.00, 8.70, 3.28, 18.70, SAN);
+    B(0.05, 2.00, 1.00, 9.18, 4.25, 18.70, GLS, null, true);
+    B(0.60, 0.16, 0.36, 7.80, 4.06, 17.20, SAN);
+    B(0.05, 0.65, 0.50, 7.55, 4.55, 17.20, GLS, null, true);
+    // family bathroom
+    B(0.40, 0.42, 0.60,  9.70, 3.44, 18.90, SAN);
+    B(0.22, 0.55, 0.44,  9.70, 3.61, 19.16, SAN);
+    B(0.85, 0.06, 0.85, 10.25, 3.28, 18.10, SAN);
+    B(0.50, 0.16, 0.34,  9.80, 4.06, 17.70, SAN);
+
+    /* ---------------- vehicles and planting ---------------- */
+
+    function car(cz, paint) {
+      var g = new THREE.Group();
+      B(4.40, 0.62, 1.82,  0.00, 0.46, 0, paint, g);
+      B(2.50, 0.60, 1.72,  0.20, 1.05, 0, paint, g);
+      B(2.32, 0.48, 1.74,  0.22, 1.05, 0, GLS,  g, true);
+      B(0.34, 0.34, 1.92, -1.40, 0.33, 0, TYRE, g, true);
+      B(0.34, 0.34, 1.92,  1.35, 0.33, 0, TYRE, g, true);
+      g.position.set(8.80, 0, cz);
+      root.add(g);
+    }
+    car(21.9, CARB);
+    car(24.1, CARR);
+
+    function shrub(x, z, r, mat) {
+      var e = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat || LF);
+      e.position.set(x, r * 0.72, z); e.scale.y = 0.76;
+      e.castShadow = true; e.receiveShadow = true;
+      root.add(e);
+    }
+    function tree(x, z, h, r) {
+      var t = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.26, h, 10), TRK);
+      t.position.set(x, h / 2, z); t.castShadow = true; root.add(t);
+      var c = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), LF);
+      c.position.set(x, h + r * 0.5, z); c.scale.y = 0.82; c.castShadow = true; root.add(c);
+      var c2 = new THREE.Mesh(new THREE.SphereGeometry(r * 0.68, 12, 10), LF2);
+      c2.position.set(x + r * 0.52, h + r * 0.12, z - r * 0.42); c2.castShadow = true; root.add(c2);
+    }
+    tree(15.9,  5.6, 3.1, 1.95);
+    tree(15.5, 30.8, 3.5, 2.25);
+    tree( 2.1, 32.8, 3.2, 2.05);
+    tree(15.9, 13.5, 2.9, 1.70);
+    var shrubs = [
+      [4.6, 3.5, 0.56, LF], [6.0, 3.4, 0.42, LF2], [11.0, 3.5, 0.50, LF2], [12.4, 3.4, 0.62, LF],
+      [14.9, 16.5, 0.60, LF2], [15.1, 19.5, 0.50, LF], [15.4, 22.5, 0.58, LF2], [15.2, 26.0, 0.54, LF],
+      [8.2, 29.8, 0.60, LF], [11.6, 30.4, 0.50, LF2], [4.6, 30.0, 0.56, LF], [1.6, 25.0, 0.50, LF2]
+    ];
+    for (i = 0; i < shrubs.length; i++) shrub(shrubs[i][0], shrubs[i][1], shrubs[i][2], shrubs[i][3]);
+
+    /* ---------------- soft interior fill lights ---------------- */
+
+    var fillPositions = [
+      [9.8, 1.9, 10.3], [5.0, 1.9, 14.8], [11.1, 1.9, 17.8], [5.0, 1.9, 17.8],
+      [11.0, 4.6, 15.2], [5.3, 4.6, 17.9], [5.0, 4.6, 14.6], [11.9, 4.6, 18.3], [9.6, 1.6, 23.5]
+    ];
+    var fillLights = [];
+    for (i = 0; i < fillPositions.length; i++) {
+      var p = fillPositions[i];
+      var pl = new THREE.PointLight(0xFFF0DC, 0.32, 9, 2);
+      pl.position.set(p[0] - PW / 2, p[1], p[2] - TD / 2);
+      fillLights.push(pl);
+    }
+
+    return { root: root, roofGroup: roofGroup, fillLights: fillLights };
+  }
+
+  global.HouseModel = {
+    DIMS: { PW: PW, PD: PD, RD: RD, TD: TD },
+    ROOMS: ROOMS,
+    build: build
+  };
+
+})(window);
+</script>
+
+<!-- ==========================================================
+     Renderer, lighting, camera modes and UI.
+     ========================================================== -->
+<script>
+/*
+ * viewer.js — renderer, lighting, camera modes and UI.
+ *
+ * Every optional subsystem degrades rather than failing: no environment map,
+ * no float buffers, no clipping planes, and the viewer still runs. If setup
+ * does fail hard, the banner names the phase it failed in and prints the
+ * message and the top of the stack, so the fault can be pinned down without
+ * opening the console.
+ */
+(function () {
+  'use strict';
+
+  var msg = document.getElementById('msg');
+  var phase = 'startup';
+
+  function show(html) { msg.style.display = 'block'; msg.innerHTML = html; }
+  function hide() { msg.style.display = 'none'; }
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  if (typeof THREE === 'undefined') {
+    show('<b>Could not load three.js.</b><br>This page needs internet access the first ' +
+         'time it runs, and some networks block <code>cdnjs.cloudflare.com</code>.');
+    return;
+  }
+
+  try {
+    start();
+  } catch (err) {
+    if (!err || err.message !== '__handled__') {
+      var line = '';
+      if (err && err.stack) {
+        var parts = err.stack.split('\n');
+        line = '<br><code>' + esc((parts[1] || '').trim()) + '</code>';
+      }
+      show('<b>Stopped while ' + esc(phase) + '.</b><br><code>' +
+           esc(err && err.message ? err.message : err) + '</code>' + line +
+           '<br><br>Send me that line and I can fix it.');
+    }
+    console.error('[' + phase + ']', err);
+  }
+
+function start() {
+
+  var DIMS = HouseModel.DIMS;
+  var PW = DIMS.PW, TD = DIMS.TD;
+
+  /* ---------------- renderer ---------------- */
+
+  phase = 'creating the WebGL renderer';
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+  } catch (e) {
+    show('<b>WebGL could not start.</b><br>This browser will not give the page a 3D ' +
+         'context. Try Chrome or Edge, and check hardware acceleration is enabled in ' +
+         'the browser settings.<br><br><code>' + esc(e && e.message ? e.message : e) + '</code>');
+    throw new Error('__handled__');
+  }
+  if (!renderer.getContext || !renderer.getContext()) {
+    show('<b>WebGL could not start.</b><br>The page got no 3D context. Try Chrome or ' +
+         'Edge with hardware acceleration enabled.');
+    throw new Error('__handled__');
+  }
+
+  // Keep memory sane on integrated graphics: three full float buffers at
+  // devicePixelRatio 2 across a large screen is a lot to ask for.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.outputEncoding = THREE.LinearEncoding;   // tone mapping happens in the output pass
+  renderer.toneMapping = THREE.NoToneMapping;
+
+  var clippingWorks = true;
+  try { renderer.localClippingEnabled = true; }
+  catch (e) { clippingWorks = false; console.warn('Clipping planes unavailable.'); }
+
+  document.getElementById('view').appendChild(renderer.domElement);
+  renderer.domElement.addEventListener('webglcontextlost', function (e) {
+    e.preventDefault();
+    show('<b>The graphics context was lost.</b><br>Reload the page to carry on.');
+  });
+  hide();
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.15, 600);
+
+  /* ---------------- sky and image based lighting ---------------- */
+
+  phase = 'building the sky';
+  function skyTexture() {
+    var c = document.createElement('canvas'); c.width = 2048; c.height = 1024;
+    var x = c.getContext('2d');
+    if (!x) return null;
+    var g = x.createLinearGradient(0, 0, 0, 1024);
+    g.addColorStop(0.00, '#1F5F98'); g.addColorStop(0.34, '#6FA3CC');
+    g.addColorStop(0.49, '#C6D8E4'); g.addColorStop(0.52, '#8B9E79');
+    g.addColorStop(1.00, '#3F5A2E');
+    x.fillStyle = g; x.fillRect(0, 0, 2048, 1024);
+    x.globalAlpha = 0.55; x.fillStyle = '#ffffff';
+    for (var i = 0; i < 70; i++) {
+      var cx = Math.random() * 2048, cy = 90 + Math.random() * 300, r = 40 + Math.random() * 130;
+      x.beginPath();
+      if (x.ellipse) x.ellipse(cx, cy, r, r * 0.32, 0, 0, 6.3);
+      else x.arc(cx, cy, r * 0.4, 0, 6.3);
+      x.fill();
+    }
+    x.globalAlpha = 1;
+    var t = new THREE.CanvasTexture(c);
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    t.encoding = THREE.sRGBEncoding;
+    return t;
+  }
+  var sky = null;
+  try { sky = skyTexture(); } catch (e) { console.warn('Sky texture failed.', e); }
+  scene.background = sky ? sky : new THREE.Color(0x9FBBD0);
+
+  phase = 'preparing environment lighting';
+  if (sky) {
+    try {
+      var pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+      scene.environment = pmrem.fromEquirectangular(sky).texture;
+    } catch (e) {
+      console.warn('Environment map unavailable; lighting will be flatter.', e);
+    }
+  }
+  scene.fog = new THREE.Fog(0xB6C6D2, 140, 320);
+
+  phase = 'placing the lights';
+  var hemi = new THREE.HemisphereLight(0xBFD8EA, 0x4E6B33, 0.50);
+  scene.add(hemi);
+  var sun = new THREE.DirectionalLight(0xFFF3DE, 2.5);
+  sun.castShadow = true;
+  sun.shadow.mapSize.width = 2048;
+  sun.shadow.mapSize.height = 2048;
+  var sc = sun.shadow.camera;
+  sc.left = -28; sc.right = 28; sc.top = 28; sc.bottom = -28; sc.near = 1; sc.far = 180;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.022;
+  scene.add(sun);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.16));
+
+  /* ---------------- the building ---------------- */
+
+  phase = 'building the geometry';
+  if (typeof HouseModel === 'undefined' || !HouseModel.build) {
+    throw new Error('HouseModel is missing. The geometry script did not load.');
+  }
+  var model = HouseModel.build(THREE, renderer);
+  scene.add(model.root);
+  var i;
+  for (i = 0; i < model.fillLights.length; i++) scene.add(model.fillLights[i]);
+
+  /* ---------------- room list ---------------- */
+
+  phase = 'filling the room list';
+  var ROOMS = HouseModel.ROOMS;
+  var sel = document.getElementById('rooms');
+  for (i = 0; i < ROOMS.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = ROOMS[i][0];
+    sel.appendChild(opt);
+  }
+
+  /* ---------------- camera modes ---------------- */
+
+  phase = 'setting up the camera';
+  var mode = 'out';
+  var target = new THREE.Vector3(8.6 - PW / 2, 3.0, 15.5 - TD / 2);
+  var theta = -0.86, phi = 1.04, radius = 46;
+  var walkPos = new THREE.Vector3(8.10 - PW / 2, 1.65, 5.60 - TD / 2);
+  var walkYaw = -0.10, walkPitch = 0;
+
+  var clipGround = new THREE.Plane(new THREE.Vector3(0, -1, 0), 2.25);
+  var clipUpperTop = new THREE.Plane(new THREE.Vector3(0, -1, 0), 5.55);
+  var clipUpperBot = new THREE.Plane(new THREE.Vector3(0, 1, 0), -3.15);
+
+  var MODE_BUTTONS = { out: 'mdOut', gnd: 'mdGnd', up: 'mdUp', walk: 'mdWalk' };
+
+  function applyMode() {
+    if (clippingWorks) {
+      if (mode === 'gnd') renderer.clippingPlanes = [clipGround];
+      else if (mode === 'up') renderer.clippingPlanes = [clipUpperTop, clipUpperBot];
+      else renderer.clippingPlanes = [];
+    }
+    model.roofGroup.visible = (mode === 'out' || mode === 'walk');
+    camera.fov = (mode === 'walk') ? 68 : 40;
+    camera.updateProjectionMatrix();
+    var hint = document.getElementById('hint');
+    if (hint) hint.style.display = (mode === 'walk') ? 'block' : 'none';
+    for (var k in MODE_BUTTONS) {
+      if (Object.prototype.hasOwnProperty.call(MODE_BUTTONS, k)) {
+        var b = document.getElementById(MODE_BUTTONS[k]);
+        if (b) b.classList.toggle('on', k === mode);
+      }
+    }
+    updateCamera();
+  }
+
+  function updateCamera() {
+    if (mode === 'walk') {
+      camera.position.copy(walkPos);
+      var dir = new THREE.Vector3(
+        Math.sin(walkYaw) * Math.cos(walkPitch),
+        Math.sin(walkPitch),
+        Math.cos(walkYaw) * Math.cos(walkPitch)
+      );
+      camera.lookAt(walkPos.x + dir.x, walkPos.y + dir.y, walkPos.z + dir.z);
+    } else {
+      camera.position.set(
+        target.x + radius * Math.sin(phi) * Math.sin(theta),
+        target.y + radius * Math.cos(phi),
+        target.z + radius * Math.sin(phi) * Math.cos(theta)
+      );
+      camera.lookAt(target);
+    }
+    camera.updateMatrixWorld();
+    updateRose();
+    resetAccumulation();
+  }
+
+  function goToRoom(index) {
+    var r = ROOMS[index];
+    walkPos.set(r[1] - PW / 2, r[2], r[3] - TD / 2);
+    walkYaw = r[4];
+    walkPitch = -0.04;
+    mode = 'walk';
+    applyMode();
+  }
+
+  sel.addEventListener('change', function () {
+    if (sel.value !== '') { goToRoom(parseInt(sel.value, 10)); sel.value = ''; }
+  });
+
+  /* ---------------- input ---------------- */
+
+  phase = 'wiring up the controls';
+  var dragging = false, lastX = 0, lastY = 0;
+  var el = renderer.domElement;
+
+  function pointerDown(x, y) { dragging = true; lastX = x; lastY = y; }
+  function pointerMove(x, y) {
+    if (!dragging) return;
+    var dx = x - lastX, dy = y - lastY;
+    lastX = x; lastY = y;
+    if (mode === 'walk') {
+      walkYaw -= dx * 0.004;
+      walkPitch -= dy * 0.003;
+      walkPitch = Math.max(-1.25, Math.min(1.25, walkPitch));
+    } else {
+      theta -= dx * 0.006;
+      phi -= dy * 0.004;
+      phi = Math.max(0.16, Math.min(1.45, phi));
+    }
+    updateCamera();
+  }
+  function pointerUp() { dragging = false; }
+
+  el.addEventListener('mousedown', function (e) { pointerDown(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', function (e) { pointerMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', pointerUp);
+  el.addEventListener('touchstart', function (e) {
+    pointerDown(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  el.addEventListener('touchmove', function (e) {
+    pointerMove(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault();
+  }, { passive: false });
+  el.addEventListener('touchend', pointerUp);
+
+  el.addEventListener('wheel', function (e) {
+    if (mode === 'walk') {
+      var d = new THREE.Vector3(Math.sin(walkYaw), 0, Math.cos(walkYaw))
+        .multiplyScalar(-e.deltaY * 0.012);
+      walkPos.add(d);
+    } else {
+      radius = Math.max(20, Math.min(95, radius * (1 + e.deltaY * 0.0011)));
+    }
+    updateCamera();
+    e.preventDefault();
+  }, { passive: false });
+
+  var keys = {};
+  window.addEventListener('keydown', function (e) {
+    if (!e.key) return;
+    if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    keys[e.key.toLowerCase()] = true;
+  });
+  window.addEventListener('keyup', function (e) {
+    if (!e.key) return;
+    keys[e.key.toLowerCase()] = false;
+  });
+
+  function stepWalk() {
+    if (mode !== 'walk') return;
+    var speed = keys.shift ? 0.22 : 0.09;
+    var fwd = 0, side = 0, vert = 0;
+    if (keys.w || keys.arrowup) fwd += 1;
+    if (keys.s || keys.arrowdown) fwd -= 1;
+    if (keys.a || keys.arrowleft) side -= 1;
+    if (keys.d || keys.arrowright) side += 1;
+    if (keys.e) vert += 1;
+    if (keys.q) vert -= 1;
+    if (!fwd && !side && !vert) return;
+    var f = new THREE.Vector3(Math.sin(walkYaw), 0, Math.cos(walkYaw));
+    var r = new THREE.Vector3(Math.cos(walkYaw), 0, -Math.sin(walkYaw));
+    walkPos.addScaledVector(f, fwd * speed).addScaledVector(r, side * speed);
+    walkPos.y = Math.max(0.4, Math.min(9.0, walkPos.y + vert * speed));
+    updateCamera();
+  }
+
+  /* ---------------- compass ---------------- */
+
+  var roseInner = document.getElementById('roseInner');
+  var pA = new THREE.Vector3(), pB = new THREE.Vector3();
+  function updateRose() {
+    if (!roseInner) return;
+    var t = (mode === 'walk')
+      ? new THREE.Vector3(walkPos.x + Math.sin(walkYaw) * 4, walkPos.y, walkPos.z + Math.cos(walkYaw) * 4)
+      : target;
+    pA.copy(t).project(camera);
+    pB.set(t.x, t.y, t.z - 4).project(camera);
+    var dx = pB.x - pA.x, dy = -(pB.y - pA.y);
+    roseInner.style.transform = 'rotate(' + (Math.atan2(dx, -dy) * 180 / Math.PI).toFixed(1) + 'deg)';
+  }
+
+  /* ---------------- progressive refinement ---------------- */
+
+  phase = 'allocating the render buffers';
+  var accumulationWorks = true;
+  var rtSample = null, rtA = null, rtB = null, front = 0, frame = 0;
+  var MAX_SAMPLES = 140;
+  var SUN_SOFTNESS = 1.15;   // metres of jitter, controls how soft shadow edges get
+
+  function liveMode() {
+    accumulationWorks = false;
+    rtSample = rtA = rtB = null;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+  }
+
+  function makeTargets() {
+    if (!accumulationWorks) return;
+    var pr = renderer.getPixelRatio();
+    var w = Math.max(2, Math.floor(window.innerWidth * pr));
+    var h = Math.max(2, Math.floor(window.innerHeight * pr));
+    var opts = {
+      type: THREE.HalfFloatType,
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      depthBuffer: true,
+      stencilBuffer: false
+    };
+    try {
+      if (rtSample) rtSample.dispose();
+      if (rtA) rtA.dispose();
+      if (rtB) rtB.dispose();
+      rtSample = new THREE.WebGLRenderTarget(w, h, opts);
+      rtA = new THREE.WebGLRenderTarget(w, h, opts);
+      rtB = new THREE.WebGLRenderTarget(w, h, opts);
+    } catch (e) {
+      console.warn('Float buffers unavailable; rendering live instead.', e);
+      liveMode();
+    }
+  }
+  makeTargets();
+
+  var quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  var quadGeo = new THREE.PlaneGeometry(2, 2);
+
+  var blendMat = new THREE.ShaderMaterial({
+    uniforms: { tCur: { value: null }, tPrev: { value: null }, uW: { value: 1.0 } },
+    vertexShader:
+      'varying vec2 vUv;' +
+      'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader:
+      'varying vec2 vUv; uniform sampler2D tCur, tPrev; uniform float uW;' +
+      'void main(){ gl_FragColor = mix(texture2D(tPrev, vUv), texture2D(tCur, vUv), uW); }'
+  });
+
+  var outMat = new THREE.ShaderMaterial({
+    uniforms: { tAcc: { value: null }, uExposure: { value: 1.05 } },
+    vertexShader:
+      'varying vec2 vUv;' +
+      'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: [
+      'varying vec2 vUv;',
+      'uniform sampler2D tAcc;',
+      'uniform float uExposure;',
+      'vec3 aces(vec3 x){',
+      '  float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;',
+      '  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);',
+      '}',
+      'void main(){',
+      '  vec3 col = texture2D(tAcc, vUv).rgb * uExposure;',
+      '  col = aces(col);',
+      '  col = pow(col, vec3(1.0 / 2.2));',
+      '  gl_FragColor = vec4(col, 1.0);',
+      '}'
+    ].join('\n')
+  });
+
+  var blendScene = new THREE.Scene(); blendScene.add(new THREE.Mesh(quadGeo, blendMat));
+  var outScene = new THREE.Scene(); outScene.add(new THREE.Mesh(quadGeo, outMat));
+
+  function resetAccumulation() { frame = 0; }
+
+  /* ---------------- sun positions ---------------- */
+
+  phase = 'positioning the sun';
+  var SUNS = {
+    m1: { pos: [ 44, 22, 28], color: 0xFFDCAA, intensity: 2.1, hemi: 0.42 },
+    m2: { pos: [ 12, 60, 22], color: 0xFFF6EA, intensity: 2.6, hemi: 0.52 },
+    m3: { pos: [-42, 20, 10], color: 0xFFC58A, intensity: 2.0, hemi: 0.40 }
+  };
+  var sunKey = 'm2';
+
+  function applySun() {
+    var s = SUNS[sunKey];
+    sun.color.setHex(s.color);
+    if (sun.color.convertSRGBToLinear) sun.color.convertSRGBToLinear();
+    sun.intensity = s.intensity;
+    hemi.intensity = s.hemi;
+    ['m1', 'm2', 'm3'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) b.classList.toggle('on', id === sunKey);
+    });
+    resetAccumulation();
+  }
+
+  applySun();
+  applyMode();
+
+  /* ---------------- render loop ---------------- */
+
+  phase = 'starting the render loop';
+  var counter = document.getElementById('spp');
+  var bead = document.getElementById('bead');
+
+  function loop() {
+    requestAnimationFrame(loop);
+    try {
+      stepWalk();
+
+      if (!accumulationWorks) {
+        var p = SUNS[sunKey].pos;
+        sun.position.set(p[0], p[1], p[2]);
+        renderer.setRenderTarget(null);
+        renderer.render(scene, camera);
+        if (counter) counter.textContent = 'Live';
+        return;
+      }
+
+      if (frame >= MAX_SAMPLES) {
+        renderer.setRenderTarget(null);
+        outMat.uniforms.tAcc.value = (front === 0 ? rtA : rtB).texture;
+        renderer.render(outScene, quadCam);
+        return;
+      }
+
+      var base = SUNS[sunKey].pos;
+      sun.position.set(
+        base[0] + (Math.random() - 0.5) * SUN_SOFTNESS * 2,
+        base[1] + (Math.random() - 0.5) * SUN_SOFTNESS,
+        base[2] + (Math.random() - 0.5) * SUN_SOFTNESS * 2
+      );
+      camera.setViewOffset(
+        window.innerWidth, window.innerHeight,
+        (Math.random() - 0.5), (Math.random() - 0.5),
+        window.innerWidth, window.innerHeight
+      );
+
+      renderer.setRenderTarget(rtSample);
+      renderer.render(scene, camera);
+
+      var prev = (front === 0) ? rtA : rtB;
+      var next = (front === 0) ? rtB : rtA;
+      blendMat.uniforms.tCur.value = rtSample.texture;
+      blendMat.uniforms.tPrev.value = prev.texture;
+      blendMat.uniforms.uW.value = 1 / (frame + 1);
+      renderer.setRenderTarget(next);
+      renderer.render(blendScene, quadCam);
+
+      renderer.setRenderTarget(null);
+      outMat.uniforms.tAcc.value = next.texture;
+      renderer.render(outScene, quadCam);
+
+      front = 1 - front;
+      frame++;
+      camera.clearViewOffset();
+
+      if (counter) {
+        counter.textContent = (frame >= MAX_SAMPLES)
+          ? 'Refined'
+          : ('Refining ' + frame + '/' + MAX_SAMPLES);
+      }
+      if (bead) bead.classList.toggle('done', frame >= MAX_SAMPLES);
+
+    } catch (e) {
+      // Drop the refinement path and keep drawing rather than freezing.
+      console.warn('Refinement failed, falling back to live rendering.', e);
+      camera.clearViewOffset();
+      liveMode();
+      renderer.setRenderTarget(null);
+    }
+  }
+  loop();
+
+  /* ---------------- buttons ---------------- */
+
+  phase = 'attaching the buttons';
+  function on(id, fn) {
+    var b = document.getElementById(id);
+    if (b) b.addEventListener('click', fn);
+  }
+  on('mdOut', function () {
+    mode = 'out'; theta = -0.86; phi = 1.04; radius = 46;
+    target.set(8.6 - PW / 2, 3.0, 15.5 - TD / 2);
+    applyMode();
+  });
+  on('mdGnd', function () {
+    mode = 'gnd'; theta = -0.80; phi = 0.42; radius = 34;
+    target.set(8.1 - PW / 2, 1.2, 13.5 - TD / 2);
+    applyMode();
+  });
+  on('mdUp', function () {
+    mode = 'up'; theta = -0.80; phi = 0.40; radius = 30;
+    target.set(8.1 - PW / 2, 3.6, 16.2 - TD / 2);
+    applyMode();
+  });
+  on('mdWalk', function () { goToRoom(0); });
+  on('m1', function () { sunKey = 'm1'; applySun(); });
+  on('m2', function () { sunKey = 'm2'; applySun(); });
+  on('m3', function () { sunKey = 'm3'; applySun(); });
+  on('save', function () {
+    try {
+      var a = document.createElement('a');
+      a.download = 'house-view.png';
+      a.href = renderer.domElement.toDataURL('image/png');
+      a.click();
+    } catch (e) { console.warn('Could not save the image.', e); }
+  });
+
+  window.addEventListener('resize', function () {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    makeTargets();
+    updateCamera();
+  });
+
+  phase = 'running';
+}
+})();
+</script>
+
+</body>
+</html>
